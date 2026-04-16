@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>JIG管理システム</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+* { box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+#sidebar { width:220px;flex-shrink:0;height:100vh;overflow-y:auto;border-right:1px solid #e5e7eb;background:#fff;display:flex;flex-direction:column; }
+#main-content { flex:1;overflow-y:auto;height:100vh; }
+@media (max-width:640px) {
+  body { display:block !important; }
+  #sidebar { display:none !important; }
+  #mobile-bottom-nav { display:flex !important; }
+  #main-content { height:calc(100vh - 64px);overflow-y:auto;padding-bottom:8px; }
+  .page { padding:16px !important; }
+}
+#mobile-bottom-nav { display:none;position:fixed;bottom:0;left:0;right:0;height:64px;background:#fff;border-top:1px solid #e5e7eb;z-index:100;align-items:stretch; }
+.bottom-nav-item { flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;color:#9ca3af;cursor:pointer;transition:color .15s;border:none;background:none;padding:0;-webkit-tap-highlight-color:transparent; }
+.bottom-nav-item.active { color:#7c3aed; }
+.bottom-nav-item svg { width:22px;height:22px; }
+#more-drawer { display:none;position:fixed;bottom:64px;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;z-index:99;padding:8px 0; }
+#more-drawer.open { display:block; }
+.drawer-item { display:flex;align-items:center;gap:12px;padding:12px 20px;font-size:14px;color:#374151;cursor:pointer; }
+.drawer-item svg { width:20px;height:20px; }
+#drawer-overlay { display:none;position:fixed;inset:0;z-index:98; }
+#drawer-overlay.open { display:block; }
+.sidebar-link { display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;font-size:14px;color:#374151;cursor:pointer;transition:background .1s; }
+.sidebar-link:hover { background:#f9fafb; }
+.sidebar-link.active { background:#ede9fe;color:#5b21b6;font-weight:600; }
+.status-available { background:#d1fae5;color:#065f46; }
+.status-in_use { background:#fee2e2;color:#991b1b; }
+.stat-card { background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;text-align:center; }
+.page.hidden { display:none; }
+/* Image popup */
+#img-popup-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center; }
+#img-popup-overlay.open { display:flex; }
+#img-popup-inner { position:relative;max-width:90vw;max-height:86vh; }
+#img-popup-inner img { display:block;max-width:100%;max-height:86vh;border-radius:12px; }
+#img-popup-close { position:absolute;top:-14px;right:-14px;width:32px;height:32px;border-radius:50%;background:#fff;border:none;cursor:pointer;font-size:18px;line-height:32px;text-align:center;color:#374151;box-shadow:0 2px 8px rgba(0,0,0,.25); }
+/* Image icon button */
+.img-btn { width:44px;height:44px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;cursor:pointer;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;transition:opacity .15s;padding:0; }
+.img-btn:disabled { opacity:.35;cursor:default; }
+.img-btn img { width:100%;height:100%;object-fit:cover;border-radius:7px; }
+.img-btn svg { width:22px;height:22px;color:#9ca3af; }
+/* Admin tabs */
+.admin-tab { padding:8px 16px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;transition:all .15s; }
+.admin-tab.active { color:#7c3aed;border-bottom-color:#7c3aed; }
+</style>
+</head>
+<body class="bg-gray-50 flex" style="min-height:100vh;">
+
+<!-- IMAGE POPUP -->
+<div id="img-popup-overlay" onclick="closeImgPopup(event)">
+  <div id="img-popup-inner">
+    <button id="img-popup-close" onclick="closeImgPopup()">✕</button>
+    <img id="img-popup-img" src="" alt="JIG"/>
+  </div>
+</div>
+
+<!-- DESKTOP SIDEBAR -->
+<aside id="sidebar">
+  <div style="padding:16px 20px 12px;border-bottom:1px solid #f3f4f6;">
+    <h1 style="font-size:16px;font-weight:700;color:#5b21b6;margin:0;">JIG管理</h1>
+    <p style="font-size:11px;color:#9ca3af;margin:4px 0 0;">管理システム</p>
+  </div>
+  <nav style="flex:1;padding:12px 10px;display:flex;flex-direction:column;gap:2px;">
+    <p style="font-size:11px;font-weight:600;color:#9ca3af;padding:4px 8px;margin:0 0 2px;">DASHBOARD</p>
+    <a class="sidebar-link" onclick="go('home')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>Home</a>
+    <a class="sidebar-link" onclick="go('borrow')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>Borrow（借出）</a>
+    <a class="sidebar-link" onclick="go('return')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>Return（返却）</a>
+    <p style="font-size:11px;font-weight:600;color:#9ca3af;padding:4px 8px;margin:8px 0 2px;">MONITOR</p>
+    <a class="sidebar-link" onclick="go('jig-list')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>JIG一覧</a>
+    <a class="sidebar-link" onclick="go('log')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>Log（履歴）</a>
+    <a class="sidebar-link" onclick="go('comment')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>Comment</a>
+    <p style="font-size:11px;font-weight:600;color:#9ca3af;padding:4px 8px;margin:8px 0 2px;">ADMIN</p>
+    <a class="sidebar-link" onclick="go('admin')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>管理（Admin）</a>
+  </nav>
+  <div style="padding:12px 16px;border-top:1px solid #f3f4f6;font-size:12px;color:#9ca3af;display:flex;align-items:center;gap:8px;">
+    <span id="user-info-desk">未ログイン</span>
+    <button id="logout-btn-desk" class="hidden" onclick="logout()" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:12px;">ログアウト</button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div id="main-content">
+
+  <!-- HOME -->
+  <div id="page-home" class="page" style="padding:24px;max-width:640px;margin:0 auto;">
+    <h2 style="font-size:20px;font-weight:700;margin:0 0 16px;color:#111827;">Dashboard</h2>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;">
+      <div class="stat-card"><div id="stat-total" style="font-size:28px;font-weight:700;color:#111827;">-</div><div style="font-size:12px;color:#6b7280;margin-top:4px;">総数</div></div>
+      <div class="stat-card"><div id="stat-inuse" style="font-size:28px;font-weight:700;color:#ef4444;">-</div><div style="font-size:12px;color:#6b7280;margin-top:4px;">使用中</div></div>
+      <div class="stat-card"><div id="stat-avail" style="font-size:28px;font-weight:700;color:#10b981;">-</div><div style="font-size:12px;color:#6b7280;margin-top:4px;">空き</div></div>
+    </div>
+    <h3 style="font-size:15px;font-weight:600;color:#374151;margin:0 0 12px;">Information</h3>
+    <div id="info-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+  </div>
+
+  <!-- BORROW -->
+  <div id="page-borrow" class="page hidden" style="padding:24px;max-width:640px;margin:0 auto;">
+    <h2 style="font-size:20px;font-weight:700;margin:0 0 16px;color:#111827;">Borrow JIG（借出）</h2>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:13px;color:#4b5563;display:block;margin-bottom:4px;">借出者名前 *</label>
+      <input id="borrower-name" type="text" placeholder="名前を入力" style="width:100%;border:1px solid #d1d5db;border-radius:10px;padding:10px 14px;font-size:14px;outline:none;"/>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button id="btn-scan"   onclick="setBorrowMode('scan')"   style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:600;border:2px solid #7c3aed;background:#ede9fe;color:#5b21b6;cursor:pointer;">Scan QR</button>
+      <button id="btn-manual" onclick="setBorrowMode('manual')" style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:600;border:2px solid #e5e7eb;background:#fff;color:#374151;cursor:pointer;">Manual</button>
+    </div>
+    <div id="scan-area" style="margin-bottom:14px;">
+      <div id="qr-reader" style="border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;width:100%;max-width:360px;margin:0 auto;"></div>
+      <div id="scan-result" style="margin-top:10px;font-size:13px;color:#059669;min-height:20px;text-align:center;"></div>
+    </div>
+    <div id="manual-area" style="display:none;margin-bottom:14px;">
+      <div id="jig-cards" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+    <div id="borrow-queue" style="display:none;margin-bottom:14px;background:#f5f3ff;border-radius:10px;padding:12px;">
+      <p style="font-size:12px;color:#7c3aed;font-weight:600;margin:0 0 8px;">選択済み JIG:</p>
+      <div id="queue-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+    </div>
+    <button onclick="confirmBorrow()" style="width:100%;background:#7c3aed;color:#fff;padding:12px;border-radius:10px;font-size:15px;font-weight:600;border:none;cursor:pointer;">確認して借出</button>
+    <div id="borrow-result" style="display:none;margin-top:20px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;">
+      <p style="font-size:14px;font-weight:600;color:#374151;margin:0 0 10px;">Session QR（返却用）</p>
+      <img id="session-qr" style="width:180px;height:180px;border:1px solid #e5e7eb;border-radius:8px;display:block;"/>
+      <a id="download-qr" download="session_qr.png" style="display:inline-block;margin-top:8px;font-size:13px;color:#7c3aed;text-decoration:underline;">ダウンロード</a>
+    </div>
+  </div>
+
+  <!-- RETURN -->
+  <div id="page-return" class="page hidden" style="padding:24px;max-width:640px;margin:0 auto;">
+    <h2 style="font-size:20px;font-weight:700;margin:0 0 8px;color:#111827;">Return JIG（返却）</h2>
+    <p style="font-size:13px;color:#6b7280;margin:0 0 16px;">Session QRをスキャンするか、トークンを直接入力してください。</p>
+    <div id="return-scan-area" style="margin-bottom:14px;">
+      <div id="qr-reader-return" style="border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;width:100%;max-width:360px;margin:0 auto;"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <input id="session-token-input" type="text" placeholder="Session token を入力" style="flex:1;border:1px solid #d1d5db;border-radius:10px;padding:10px 14px;font-size:14px;outline:none;"/>
+      <button onclick="loadSession()" style="background:#7c3aed;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;font-weight:600;border:none;cursor:pointer;">検索</button>
+    </div>
+    <div id="return-session" style="display:none;">
+      <h3 style="font-size:15px;font-weight:600;color:#374151;margin:0 0 10px;">返却するJIGを選択</h3>
+      <div id="return-jig-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="submitReturn(false)" style="flex:1;background:#059669;color:#fff;padding:11px;border-radius:10px;font-size:14px;font-weight:600;border:none;cursor:pointer;">選択分を返却</button>
+        <button onclick="submitReturn(true)"  style="flex:1;background:#374151;color:#fff;padding:11px;border-radius:10px;font-size:14px;font-weight:600;border:none;cursor:pointer;">全て返却</button>
+      </div>
+      <div id="return-result" style="display:none;margin-top:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;">
+        <p style="font-size:14px;font-weight:600;color:#065f46;margin:0 0 8px;">返却完了</p>
+        <div id="new-session-qr-wrap" style="display:none;">
+          <p style="font-size:12px;color:#4b5563;margin:0 0 8px;">残りJIG用 新しいSession QR</p>
+          <img id="new-session-qr" style="width:160px;height:160px;border:1px solid #e5e7eb;border-radius:8px;"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JIG一覧 -->
+  <div id="page-jig-list" class="page hidden" style="padding:24px;max-width:640px;margin:0 auto;">
+    <h2 style="font-size:20px;font-weight:700;margin:0 0 16px;color:#111827;">JIG一覧</h2>
+    <div id="jig-list-content" style="display:flex;flex-direction:column;gap:10px;"></div>
+  </div>
+
+  <!-- LOG -->
+  <div id="page-log" class="page hidden" style="padding:24px;max-width:640px;margin:0 auto;">
+    <h2 style="font-size:20px;font-weight:700;margin:0 0 16px;color:#111827;">Log（履歴）</h2>
+    <div id="log-content" style="display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+
+  <!-- COMMENT -->
+  <div id="page-comment" class="page hidden" style="padding:24px;max-width:640px;margin:0 auto;">
+    <h2 style="font-size:20px;font-weight:700;margin:0 0 16px;color:#111827;">Comment</h2>
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:20px;">
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">JIG（任意）</label>
+        <select id="comment-jig" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:14px;background:#fff;outline:none;"><option value="">-- JIGを選択 --</option></select>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">名前 *</label>
+        <input id="comment-author" type="text" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:14px;outline:none;"/>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">内容 *</label>
+        <textarea id="comment-content" rows="3" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:14px;outline:none;resize:none;"></textarea>
+      </div>
+      <button onclick="submitComment()" style="width:100%;background:#7c3aed;color:#fff;padding:11px;border-radius:10px;font-size:14px;font-weight:600;border:none;cursor:pointer;">送信</button>
+    </div>
+    <div id="comment-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+  </div>
+
+  <!-- ADMIN -->
+  <div id="page-admin" class="page hidden" style="padding:24px;max-width:640px;margin:0 auto;">
+    <h2 style="font-size:20px;font-weight:700;margin:0 0 16px;color:#111827;">管理ページ</h2>
+    <div id="admin-login-box" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:20px;">
+      <p style="font-size:13px;color:#6b7280;margin:0 0 12px;">Adminとしてログインしてください</p>
+      <input id="admin-user" type="text" placeholder="Username" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:14px;margin-bottom:8px;outline:none;"/>
+      <input id="admin-pass" type="password" placeholder="Password" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:14px;margin-bottom:12px;outline:none;"/>
+      <button onclick="adminLogin()" style="width:100%;background:#7c3aed;color:#fff;padding:11px;border-radius:10px;font-size:14px;font-weight:600;border:none;cursor:pointer;">ログイン</button>
+      <p id="login-err" style="display:none;color:#ef4444;font-size:12px;margin-top:8px;">ログイン失敗</p>
+    </div>
+    <div id="admin-panel" style="display:none;">
+      <!-- Admin tabs -->
+      <div style="display:flex;border-bottom:1px solid #e5e7eb;margin-bottom:16px;gap:4px;">
+        <button class="admin-tab active" id="atab-jig"     onclick="switchAdminTab('jig')">JIG管理</button>
+        <button class="admin-tab"        id="atab-comment" onclick="switchAdminTab('comment')">Comment管理</button>
+      </div>
+      <!-- JIG section -->
+      <div id="admin-jig-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="font-size:15px;font-weight:600;color:#374151;margin:0;">JIG一覧</h3>
+          <button onclick="showAddJig()" style="background:#7c3aed;color:#fff;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;border:none;cursor:pointer;">+ 追加</button>
+        </div>
+        <!-- Add form -->
+        <div id="add-jig-form" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:14px;">
+          <p style="font-size:13px;font-weight:600;color:#374151;margin:0 0 10px;">新しいJIGを追加</p>
+          <input id="jig-name" type="text" placeholder="JIG名 *" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:14px;margin-bottom:8px;outline:none;"/>
+          <input id="jig-desc" type="text" placeholder="説明" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:14px;margin-bottom:8px;outline:none;"/>
+          <input id="jig-img"  type="text" placeholder="画像URL（任意）" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:14px;margin-bottom:12px;outline:none;"/>
+          <div style="display:flex;gap:8px;">
+            <button onclick="createJig()" style="background:#059669;color:#fff;padding:9px 20px;border-radius:8px;font-size:14px;font-weight:600;border:none;cursor:pointer;">保存</button>
+            <button onclick="document.getElementById('add-jig-form').style.display='none'" style="background:#f3f4f6;color:#374151;padding:9px 20px;border-radius:8px;font-size:14px;font-weight:600;border:none;cursor:pointer;">キャンセル</button>
+          </div>
+        </div>
+        <!-- Edit form -->
+        <div id="edit-jig-form" style="display:none;background:#faf5ff;border:1px solid #ddd6fe;border-radius:12px;padding:16px;margin-bottom:14px;">
+          <p style="font-size:13px;font-weight:600;color:#5b21b6;margin:0 0 10px;">JIGを編集</p>
+          <input type="hidden" id="edit-jig-id"/>
+          <input id="edit-jig-name" type="text" placeholder="JIG名 *" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:14px;margin-bottom:8px;outline:none;"/>
+          <input id="edit-jig-desc" type="text" placeholder="説明" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:14px;margin-bottom:8px;outline:none;"/>
+          <input id="edit-jig-img"  type="text" placeholder="画像URL（任意）" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:14px;margin-bottom:12px;outline:none;"/>
+          <div style="display:flex;gap:8px;">
+            <button onclick="saveEditJig()" style="background:#7c3aed;color:#fff;padding:9px 20px;border-radius:8px;font-size:14px;font-weight:600;border:none;cursor:pointer;">更新</button>
+            <button onclick="document.getElementById('edit-jig-form').style.display='none'" style="background:#f3f4f6;color:#374151;padding:9px 20px;border-radius:8px;font-size:14px;font-weight:600;border:none;cursor:pointer;">キャンセル</button>
+          </div>
+        </div>
+        <div id="admin-jig-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+      </div>
+      <!-- Comment section -->
+      <div id="admin-comment-section" style="display:none;">
+        <h3 style="font-size:15px;font-weight:600;color:#374151;margin:0 0 12px;">Comment一覧</h3>
+        <div id="admin-comment-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main-content -->
+
+<!-- MOBILE BOTTOM NAV -->
+<nav id="mobile-bottom-nav">
+  <button class="bottom-nav-item" id="bnav-home"     onclick="go('home')">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>Home</button>
+  <button class="bottom-nav-item" id="bnav-borrow"   onclick="go('borrow')">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>Borrow</button>
+  <button class="bottom-nav-item" id="bnav-return"   onclick="go('return')">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>Return</button>
+  <button class="bottom-nav-item" id="bnav-jig-list" onclick="go('jig-list')">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>JIG一覧</button>
+  <button class="bottom-nav-item" id="bnav-more" onclick="toggleMoreDrawer()">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>More</button>
+</nav>
+<div id="drawer-overlay" onclick="closeMoreDrawer()"></div>
+<div id="more-drawer">
+  <div class="drawer-item" onclick="go('log');closeMoreDrawer()">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>Log（履歴）</div>
+  <div class="drawer-item" onclick="go('comment');closeMoreDrawer()">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>Comment</div>
+  <div class="drawer-item" onclick="go('admin');closeMoreDrawer()">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>管理（Admin）</div>
+  <div style="padding:8px 20px;border-top:1px solid #f3f4f6;margin-top:4px;display:flex;align-items:center;gap:8px;">
+    <span id="user-info-mob" style="font-size:13px;color:#9ca3af;flex:1;">未ログイン</span>
+    <button id="logout-btn-mob" style="display:none;color:#ef4444;background:none;border:none;cursor:pointer;font-size:13px;" onclick="logout()">ログアウト</button>
+  </div>
+</div>
+
+<script>
+const API = "https://YOUR-RENDER-URL.onrender.com"; // ← Thay URL Render
+
+let token   = localStorage.getItem("jig_token")    || null;
+let isAdmin = localStorage.getItem("jig_is_admin") === "true";
+let borrowQueue = [], currentSessionJigs = [], currentSessionToken = "";
+let html5Scanner = null, html5ReturnScanner = null;
+
+/* ── helpers ── */
+const api = async (path, opts={}) => {
+  const h = {"Content-Type":"application/json"};
+  if (token) h["Authorization"] = `Bearer ${token}`;
+  const r = await fetch(API+path, {...opts, headers:{...h,...(opts.headers||{})}});
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+};
+function esc(s){ if(s==null)return""; return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+/* ── image popup ── */
+function openImgPopup(url){ document.getElementById("img-popup-img").src=url; document.getElementById("img-popup-overlay").classList.add("open"); }
+function closeImgPopup(e){ if(e&&e.target!==document.getElementById("img-popup-overlay")&&!e.target.id.startsWith("img-popup-close"))return; document.getElementById("img-popup-overlay").classList.remove("open"); }
+document.getElementById("img-popup-close").onclick = ()=>document.getElementById("img-popup-overlay").classList.remove("open");
+
+/* Returns HTML for image icon button (44x44) */
+function imgBtn(url){
+  if(url) return `<button class="img-btn" onclick="event.stopPropagation();openImgPopup('${esc(url)}')" title="画像を見る"><img src="${esc(url)}" alt="" onerror="this.parentElement.disabled=true;this.parentElement.style.opacity='.3'"/></button>`;
+  return `<button class="img-btn" disabled title="画像なし"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></button>`;
+}
+
+/* ── QR parsing ── */
+function parseQR(raw){
+  const d = raw.trim();
+  if(/^\d+$/.test(d)) return {type:"jig",id:parseInt(d)};
+  const hi = d.indexOf("#");
+  if(hi!==-1){
+    const after=d.slice(hi+1), qi=after.indexOf("?");
+    if(qi!==-1){
+      const p=new URLSearchParams(after.slice(qi+1));
+      if(p.get("session")) return {type:"session",token:p.get("session")};
+      if(p.get("jig"))     return {type:"jig",id:parseInt(p.get("jig"))};
+    }
+  }
+  try{
+    const u=new URL(d);
+    if(u.searchParams.get("session")) return {type:"session",token:u.searchParams.get("session")};
+    if(u.searchParams.get("jig"))     return {type:"jig",id:parseInt(u.searchParams.get("jig"))};
+  }catch(_){}
+  if(d.length>10&&!d.includes(" ")) return {type:"session",token:d};
+  return null;
+}
+
+/* ── navigation ── */
+function go(page){
+  document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));
+  document.getElementById("page-"+page).classList.remove("hidden");
+  document.querySelectorAll(".sidebar-link").forEach(l=>l.classList.remove("active"));
+  document.querySelectorAll(".sidebar-link").forEach(l=>{ if(l.getAttribute("onclick")&&l.getAttribute("onclick").includes("'"+page+"'")) l.classList.add("active"); });
+  document.querySelectorAll(".bottom-nav-item").forEach(b=>b.classList.remove("active"));
+  const bEl=document.getElementById("bnav-"+page); if(bEl) bEl.classList.add("active");
+  if(["log","comment","admin"].includes(page)) document.getElementById("bnav-more").classList.add("active");
+  stopAllScanners();
+  if(page==="home")     loadHome();
+  if(page==="jig-list") loadJigList();
+  if(page==="log")      loadLog();
+  if(page==="comment")  loadComment();
+  if(page==="admin")    loadAdmin();
+  if(page==="borrow"){
+    borrowQueue=[]; updateQueueDisplay();
+    document.getElementById("borrow-result").style.display="none";
+    document.getElementById("scan-result").textContent="";
+    setBorrowMode("scan");
+    const urlJig=new URLSearchParams((location.hash.split("?")[1]||"")).get("jig");
+    if(urlJig) addToQueue(parseInt(urlJig),null);
+  }
+  if(page==="return"){
+    document.getElementById("return-session").style.display="none";
+    document.getElementById("return-result").style.display="none";
+    const urlToken=new URLSearchParams((location.hash.split("?")[1]||"")).get("session");
+    if(urlToken){ document.getElementById("session-token-input").value=urlToken; loadSession(); }
+    else startReturnScanner();
+  }
+}
+function toggleMoreDrawer(){ document.getElementById("more-drawer").classList.toggle("open"); document.getElementById("drawer-overlay").classList.toggle("open"); }
+function closeMoreDrawer(){ document.getElementById("more-drawer").classList.remove("open"); document.getElementById("drawer-overlay").classList.remove("open"); }
+function stopAllScanners(){
+  if(html5Scanner){html5Scanner.stop().catch(()=>{});html5Scanner=null;}
+  if(html5ReturnScanner){html5ReturnScanner.stop().catch(()=>{});html5ReturnScanner=null;}
+}
+
+/* ── HOME ── */
+async function loadHome(){
+  try{ const s=await api("/jigs/stats"); document.getElementById("stat-total").textContent=s.total; document.getElementById("stat-inuse").textContent=s.in_use; document.getElementById("stat-avail").textContent=s.available; }catch(_){}
+  try{
+    const comments=await api("/comments/");
+    document.getElementById("info-list").innerHTML=comments.slice(0,10).map(c=>{
+      const jigLabel = c.jig ? ` / ${esc(c.jig.name)}${c.jig.description?` (${esc(c.jig.description)})`:""}` : "";
+      return `<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;">
+          <span style="font-size:12px;font-weight:600;color:#374151;">${esc(c.author_name)}<span style="font-weight:400;color:#6b7280;">${jigLabel}</span></span>
+          <span style="font-size:11px;color:#9ca3af;white-space:nowrap;">${new Date(c.created_at).toLocaleDateString("ja-JP")}</span>
+        </div>
+        <p style="font-size:14px;color:#374151;margin:0;line-height:1.6;">${esc(c.content)}</p>
+      </div>`;
+    }).join("");
+  }catch(_){}
+}
+
+/* ── BORROW ── */
+let borrowMode="scan";
+function setBorrowMode(mode){
+  borrowMode=mode; stopAllScanners();
+  const sA=document.getElementById("scan-area"), mA=document.getElementById("manual-area");
+  const bS=document.getElementById("btn-scan"), bM=document.getElementById("btn-manual");
+  if(mode==="scan"){
+    sA.style.display=""; mA.style.display="none";
+    bS.style.cssText+="border-color:#7c3aed;background:#ede9fe;color:#5b21b6;";
+    bM.style.cssText+="border-color:#e5e7eb;background:#fff;color:#374151;";
+    startBorrowScanner();
+  } else {
+    sA.style.display="none"; mA.style.display="";
+    bM.style.cssText+="border-color:#7c3aed;background:#ede9fe;color:#5b21b6;";
+    bS.style.cssText+="border-color:#e5e7eb;background:#fff;color:#374151;";
+    loadManualJigs();
+  }
+}
+
+function startBorrowScanner(){
+  html5Scanner=new Html5Qrcode("qr-reader");
+  html5Scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:220,height:220}},
+    (decoded)=>{
+      const p=parseQR(decoded);
+      if(!p){document.getElementById("scan-result").textContent="QRが認識できません"; return;}
+      /* ★ SESSION QR scanned on Borrow page → redirect to Return */
+      if(p.type==="session"){
+        stopAllScanners();
+        document.getElementById("session-token-input").value=p.token;
+        go("return");
+        return;
+      }
+      if(borrowQueue.find(x=>x.id===p.id)){document.getElementById("scan-result").textContent=`JIG #${p.id} はすでに追加済み`; return;}
+      addToQueue(p.id,null);
+    },
+    ()=>{}
+  ).catch(e=>{ document.getElementById("scan-result").textContent="カメラ起動失敗: "+e; });
+}
+
+async function addToQueue(jigId,nameHint){
+  if(borrowQueue.find(x=>x.id===jigId)) return;
+  let name=nameHint||`JIG #${jigId}`;
+  try{
+    const j=await api(`/jigs/${jigId}`);
+    if(!j){document.getElementById("scan-result").textContent=`JIG #${jigId} が見つかりません`; return;}
+    if(j.status!=="available"){document.getElementById("scan-result").textContent=`${j.name} は現在使用中です`; return;}
+    name=j.name;
+  }catch(_){}
+  borrowQueue.push({id:jigId,name});
+  document.getElementById("scan-result").textContent=`✓ ${name} を追加 (合計 ${borrowQueue.length} 件)`;
+  updateQueueDisplay();
+}
+
+async function loadManualJigs(){
+  try{
+    const jigs=await api("/jigs/");
+    jigs.sort((a,b)=>a.name.localeCompare(b.name,"ja"));
+    document.getElementById("jig-cards").innerHTML=jigs.map(j=>`
+      <div id="jig-card-${j.id}" onclick="toggleJig(${j.id},'${esc(j.name)}',this)"
+           style="background:#fff;border:2px solid #e5e7eb;border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;cursor:pointer;">
+        ${imgBtn(j.image_url)}
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(j.name)}</div>
+          <div style="font-size:12px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(j.description)}</div>
+        </div>
+        <span style="font-size:11px;padding:4px 10px;border-radius:99px;flex-shrink:0;" class="${j.status==="available"?"status-available":"status-in_use"}">${j.status==="available"?"空き":"使用中"}</span>
+      </div>`).join("");
+  }catch(e){ document.getElementById("jig-cards").innerHTML=`<p style="color:#ef4444;font-size:13px;">${e.message}</p>`; }
+}
+
+function toggleJig(id,name,el){
+  const idx=borrowQueue.findIndex(x=>x.id===id);
+  if(idx!==-1){ borrowQueue.splice(idx,1); el.style.borderColor="#e5e7eb"; el.style.background="#fff"; }
+  else { borrowQueue.push({id,name}); el.style.borderColor="#7c3aed"; el.style.background="#f5f3ff"; }
+  updateQueueDisplay();
+}
+function updateQueueDisplay(){
+  const wrap=document.getElementById("borrow-queue");
+  if(borrowQueue.length===0){wrap.style.display="none"; return;}
+  wrap.style.display="";
+  document.getElementById("queue-list").innerHTML=borrowQueue.map(item=>
+    `<span style="font-size:12px;background:#ddd6fe;color:#5b21b6;padding:4px 10px;border-radius:99px;display:inline-flex;align-items:center;gap:4px;">
+      ${esc(item.name)}<span onclick="removeFromQueue(${item.id})" style="cursor:pointer;opacity:.7;font-size:14px;">×</span></span>`
+  ).join("");
+}
+function removeFromQueue(id){
+  borrowQueue=borrowQueue.filter(x=>x.id!==id);
+  const c=document.getElementById("jig-card-"+id); if(c){c.style.borderColor="#e5e7eb";c.style.background="#fff";}
+  updateQueueDisplay();
+}
+async function confirmBorrow(){
+  const name=document.getElementById("borrower-name").value.trim();
+  if(!name){alert("借出者名前を入力してください");return;}
+  if(borrowQueue.length===0){alert("JIGを選択してください");return;}
+  try{
+    const res=await api("/borrow/",{method:"POST",body:JSON.stringify({borrower_name:name,jig_ids:borrowQueue.map(x=>x.id)})});
+    document.getElementById("borrow-result").style.display="";
+    document.getElementById("session-qr").src=res.session_qr_url;
+    document.getElementById("download-qr").href=res.session_qr_url;
+    document.getElementById("scan-result").textContent="";
+    borrowQueue=[]; updateQueueDisplay(); stopAllScanners();
+  }catch(e){alert("エラー: "+e.message);}
+}
+
+/* ── RETURN ── */
+function startReturnScanner(){
+  html5ReturnScanner=new Html5Qrcode("qr-reader-return");
+  html5ReturnScanner.start({facingMode:"environment"},{fps:10,qrbox:{width:220,height:220}},
+    (decoded)=>{
+      const p=parseQR(decoded);
+      if(!p||p.type!=="session") return;
+      document.getElementById("session-token-input").value=p.token;
+      html5ReturnScanner.stop().catch(()=>{}); html5ReturnScanner=null;
+      loadSession();
+    },()=>{}
+  ).catch(()=>{});
+}
+async function loadSession(){
+  const t=document.getElementById("session-token-input").value.trim();
+  if(!t) return;
+  currentSessionToken=t;
+  try{
+    const s=await api(`/return/${t}`);
+    currentSessionJigs=s.jigs;
+    document.getElementById("return-session").style.display="";
+    document.getElementById("return-result").style.display="none";
+    document.getElementById("return-jig-list").innerHTML=currentSessionJigs.map(j=>`
+      <label style="display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px;cursor:pointer;">
+        <input type="checkbox" class="return-check" value="${j.id}" checked style="width:18px;height:18px;accent-color:#7c3aed;flex-shrink:0;"/>
+        ${imgBtn(j.image_url)}
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;color:#111827;">${esc(j.name)}</div>
+          <div style="font-size:12px;color:#6b7280;">${esc(j.description)}</div>
+        </div>
+      </label>`).join("");
+  }catch(e){alert("Session が見つかりません: "+e.message);}
+}
+async function submitReturn(all){
+  const ids=all?null:Array.from(document.querySelectorAll(".return-check:checked")).map(c=>parseInt(c.value));
+  try{
+    const res=await api("/return/",{method:"POST",body:JSON.stringify({session_token:currentSessionToken,jig_ids:ids})});
+    document.getElementById("return-result").style.display="";
+    if(res.new_session_qr_url){
+      document.getElementById("new-session-qr-wrap").style.display="";
+      document.getElementById("new-session-qr").src=res.new_session_qr_url;
+    }
+  }catch(e){alert("エラー: "+e.message);}
+}
+
+/* ── JIG一覧 ── */
+async function loadJigList(){
+  try{
+    const jigs=await api("/jigs/");
+    jigs.sort((a,b)=>a.name.localeCompare(b.name,"ja"));
+    document.getElementById("jig-list-content").innerHTML=jigs.map(j=>`
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;">
+        ${imgBtn(j.image_url)}
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:15px;font-weight:600;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(j.name)}</div>
+          <div style="font-size:12px;color:#6b7280;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(j.description)}</div>
+        </div>
+        <span style="font-size:11px;padding:4px 10px;border-radius:99px;flex-shrink:0;" class="${j.status==="available"?"status-available":"status-in_use"}">${j.status==="available"?"空き":"使用中"}</span>
+      </div>`).join("");
+  }catch(e){ document.getElementById("jig-list-content").innerHTML=`<p style="color:#ef4444;font-size:13px;">${e.message}</p>`; }
+}
+
+/* ── LOG ── */
+async function loadLog(){
+  try{
+    const logs=await api("/logs/");
+    document.getElementById("log-content").innerHTML=logs.map(l=>`
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px;display:flex;align-items:flex-start;gap:10px;">
+        <span style="font-size:11px;padding:4px 10px;border-radius:99px;font-weight:600;white-space:nowrap;margin-top:2px;${l.action==="borrow"?"background:#dbeafe;color:#1e40af;":"background:#d1fae5;color:#065f46;"}">${l.action}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;color:#111827;">${esc(l.user_name)}</div>
+          <div style="font-size:12px;color:#6b7280;margin-top:2px;word-break:break-all;">${esc(l.jig_names)}</div>
+        </div>
+        <div style="font-size:11px;color:#9ca3af;white-space:nowrap;">${new Date(l.timestamp).toLocaleString("ja-JP")}</div>
+      </div>`).join("");
+  }catch(e){ document.getElementById("log-content").innerHTML=`<p style="color:#ef4444;font-size:13px;">${e.message}</p>`; }
+}
+
+/* ── COMMENT ── */
+async function loadComment(){
+  try{
+    const [jigs,comments]=await Promise.all([api("/jigs/"),api("/comments/")]);
+    jigs.sort((a,b)=>a.name.localeCompare(b.name,"ja"));
+    document.getElementById("comment-jig").innerHTML=
+      `<option value="">-- JIGを選択 --</option>`+
+      jigs.map(j=>`<option value="${j.id}">${esc(j.name)}</option>`).join("");
+    document.getElementById("comment-list").innerHTML=comments.map(c=>{
+      /* format: username / JIG name (description)  ·  date */
+      const jigPart = c.jig
+        ? ` <span style="color:#9ca3af;">/</span> ${esc(c.jig.name)}${c.jig.description?` <span style="color:#9ca3af;">(${esc(c.jig.description)})</span>`:""}`
+        : "";
+      return `<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+          <div style="font-size:13px;line-height:1.5;">
+            <span style="font-weight:600;color:#111827;">${esc(c.author_name)}</span>${jigPart}
+          </div>
+          <span style="font-size:11px;color:#9ca3af;white-space:nowrap;">${new Date(c.created_at).toLocaleDateString("ja-JP")}</span>
+        </div>
+        <p style="font-size:14px;color:#374151;margin:0;line-height:1.65;">${esc(c.content)}</p>
+      </div>`;
+    }).join("");
+  }catch(_){}
+}
+async function submitComment(){
+  const body={author_name:document.getElementById("comment-author").value.trim(),content:document.getElementById("comment-content").value.trim(),jig_id:document.getElementById("comment-jig").value||null};
+  if(!body.author_name||!body.content){alert("名前と内容を入力してください");return;}
+  try{
+    await api("/comments/",{method:"POST",body:JSON.stringify(body)});
+    document.getElementById("comment-author").value=""; document.getElementById("comment-content").value="";
+    loadComment();
+  }catch(e){alert("エラー: "+e.message);}
+}
+
+/* ── ADMIN ── */
+async function adminLogin(){
+  document.getElementById("login-err").style.display="none";
+  try{
+    const res=await api("/auth/login",{method:"POST",body:JSON.stringify({username:document.getElementById("admin-user").value,password:document.getElementById("admin-pass").value})});
+    token=res.access_token; isAdmin=res.is_admin;
+    localStorage.setItem("jig_token",token); localStorage.setItem("jig_is_admin",isAdmin);
+    const uname=document.getElementById("admin-user").value;
+    localStorage.setItem("jig_username",uname);
+    document.getElementById("user-info-desk").textContent=uname; document.getElementById("user-info-mob").textContent=uname;
+    document.getElementById("logout-btn-desk").classList.remove("hidden"); document.getElementById("logout-btn-mob").style.display="";
+    loadAdmin();
+  }catch{ document.getElementById("login-err").style.display=""; }
+}
+function logout(){
+  token=null; isAdmin=false;
+  localStorage.removeItem("jig_token"); localStorage.removeItem("jig_is_admin");
+  document.getElementById("user-info-desk").textContent="未ログイン"; document.getElementById("user-info-mob").textContent="未ログイン";
+  document.getElementById("logout-btn-desk").classList.add("hidden"); document.getElementById("logout-btn-mob").style.display="none";
+  go("home");
+}
+
+function switchAdminTab(tab){
+  document.querySelectorAll(".admin-tab").forEach(t=>t.classList.remove("active"));
+  document.getElementById("atab-"+tab).classList.add("active");
+  document.getElementById("admin-jig-section").style.display    = tab==="jig"     ? "" : "none";
+  document.getElementById("admin-comment-section").style.display= tab==="comment" ? "" : "none";
+  if(tab==="comment") loadAdminComments();
+}
+
+async function loadAdmin(){
+  if(!token||!isAdmin){
+    document.getElementById("admin-login-box").style.display=""; document.getElementById("admin-panel").style.display="none"; return;
+  }
+  document.getElementById("admin-login-box").style.display="none"; document.getElementById("admin-panel").style.display="";
+  await loadAdminJigs();
+}
+
+async function loadAdminJigs(){
+  try{
+    const jigs=await api("/jigs/");
+    jigs.sort((a,b)=>a.name.localeCompare(b.name,"ja"));
+    document.getElementById("admin-jig-list").innerHTML=jigs.map(j=>`
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;">
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;">
+          ${imgBtn(j.image_url)}
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:600;color:#111827;">${esc(j.name)}</div>
+            <div style="font-size:12px;color:#6b7280;margin-top:2px;">${esc(j.description)}</div>
+            ${j.image_url?`<div style="font-size:11px;color:#9ca3af;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📎 ${esc(j.image_url)}</div>`:""}
+          </div>
+          <span style="font-size:11px;padding:3px 10px;border-radius:99px;flex-shrink:0;" class="${j.status==="available"?"status-available":"status-in_use"}">${j.status==="available"?"空き":"使用中"}</span>
+        </div>
+        ${j.qr_code_url?`<div style="padding-top:10px;border-top:1px solid #f3f4f6;margin-bottom:10px;">
+          <p style="font-size:11px;color:#9ca3af;margin:0 0 6px;">固定QRコード</p>
+          <img src="${esc(j.qr_code_url)}" style="width:80px;height:80px;border:1px solid #e5e7eb;border-radius:6px;"/>
+          <a href="${esc(j.qr_code_url)}" download="jig_${j.id}_qr.png" style="display:block;font-size:11px;color:#7c3aed;margin-top:4px;text-decoration:underline;">ダウンロード</a>
+        </div>`:""}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button onclick="showEditJig(${j.id},'${esc(j.name)}','${esc(j.description)}','${esc(j.image_url||"")}')"
+            style="font-size:12px;color:#5b21b6;border:1px solid #ddd6fe;background:#f5f3ff;padding:5px 12px;border-radius:6px;cursor:pointer;">編集</button>
+          <button onclick="toggleJigStatus(${j.id},'${j.status}')"
+            style="font-size:12px;border:1px solid ${j.status==="available"?"#fecaca":"#bbf7d0"};background:${j.status==="available"?"#fff1f2":"#f0fdf4"};color:${j.status==="available"?"#991b1b":"#065f46"};padding:5px 12px;border-radius:6px;cursor:pointer;">
+            ${j.status==="available"?"→ 使用中に変更":"→ 空きに変更"}</button>
+          <button onclick="deleteJig(${j.id})"
+            style="font-size:12px;color:#ef4444;border:1px solid #fecaca;background:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;">削除</button>
+        </div>
+      </div>`).join("");
+  }catch(_){}
+}
+
+function showAddJig(){
+  document.getElementById("edit-jig-form").style.display="none";
+  const f=document.getElementById("add-jig-form");
+  f.style.display=f.style.display==="none"?"":"none";
+}
+function showEditJig(id,name,desc,img){
+  document.getElementById("add-jig-form").style.display="none";
+  document.getElementById("edit-jig-id").value=id;
+  document.getElementById("edit-jig-name").value=name;
+  document.getElementById("edit-jig-desc").value=desc;
+  document.getElementById("edit-jig-img").value=img;
+  document.getElementById("edit-jig-form").style.display="";
+  document.getElementById("edit-jig-form").scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+async function saveEditJig(){
+  const id=document.getElementById("edit-jig-id").value;
+  const body={name:document.getElementById("edit-jig-name").value.trim(),description:document.getElementById("edit-jig-desc").value.trim(),image_url:document.getElementById("edit-jig-img").value.trim()};
+  if(!body.name){alert("JIG名を入力してください");return;}
+  try{ await api(`/admin/jigs/${id}`,{method:"PUT",body:JSON.stringify(body)}); document.getElementById("edit-jig-form").style.display="none"; loadAdminJigs(); }
+  catch(e){alert("エラー: "+e.message);}
+}
+async function createJig(){
+  const body={name:document.getElementById("jig-name").value.trim(),description:document.getElementById("jig-desc").value.trim(),image_url:document.getElementById("jig-img").value.trim()};
+  if(!body.name){alert("JIG名を入力してください");return;}
+  try{
+    await api("/admin/jigs",{method:"POST",body:JSON.stringify(body)});
+    document.getElementById("jig-name").value=""; document.getElementById("jig-desc").value=""; document.getElementById("jig-img").value="";
+    document.getElementById("add-jig-form").style.display="none"; loadAdminJigs();
+  }catch(e){alert("エラー: "+e.message);}
+}
+async function deleteJig(id){
+  if(!confirm("削除しますか？")) return;
+  try{ await api(`/admin/jigs/${id}`,{method:"DELETE"}); loadAdminJigs(); }
+  catch(e){alert("エラー: "+e.message);}
+}
+async function toggleJigStatus(id,cur){
+  const next=cur==="available"?"in_use":"available";
+  try{ await api(`/admin/jigs/${id}/status?status=${next}`,{method:"PUT"}); loadAdminJigs(); }
+  catch(e){alert("エラー: "+e.message);}
+}
+
+/* Admin comment management */
+async function loadAdminComments(){
+  try{
+    const comments=await api("/comments/");
+    if(comments.length===0){
+      document.getElementById("admin-comment-list").innerHTML=`<p style="font-size:13px;color:#9ca3af;text-align:center;padding:20px 0;">Commentがありません</p>`; return;
+    }
+    document.getElementById("admin-comment-list").innerHTML=comments.map(c=>{
+      const jigPart=c.jig?` / ${esc(c.jig.name)}${c.jig.description?` (${esc(c.jig.description)})`:""}`:"";
+      return `<div id="admin-comment-${c.id}" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+          <div style="font-size:13px;">
+            <span style="font-weight:600;color:#111827;">${esc(c.author_name)}</span>
+            <span style="color:#6b7280;">${jigPart}</span>
+          </div>
+          <span style="font-size:11px;color:#9ca3af;white-space:nowrap;">${new Date(c.created_at).toLocaleDateString("ja-JP")}</span>
+        </div>
+        <p style="font-size:14px;color:#374151;margin:0 0 10px;line-height:1.6;">${esc(c.content)}</p>
+        <button onclick="deleteComment(${c.id})" style="font-size:12px;color:#ef4444;border:1px solid #fecaca;background:#fff;padding:4px 12px;border-radius:6px;cursor:pointer;">削除</button>
+      </div>`;
+    }).join("");
+  }catch(e){ document.getElementById("admin-comment-list").innerHTML=`<p style="color:#ef4444;font-size:13px;">${e.message}</p>`; }
+}
+async function deleteComment(id){
+  if(!confirm("このCommentを削除しますか？")) return;
+  try{ await api(`/admin/comments/${id}`,{method:"DELETE"}); loadAdminComments(); }
+  catch(e){alert("エラー: "+e.message);}
+}
+
+/* ── Init ── */
+if(token){
+  const u=localStorage.getItem("jig_username")||"Admin";
+  document.getElementById("user-info-desk").textContent=u;
+  document.getElementById("user-info-mob").textContent=u;
+  document.getElementById("logout-btn-desk").classList.remove("hidden");
+  document.getElementById("logout-btn-mob").style.display="";
+}
+go("home");
+</script>
+</html>

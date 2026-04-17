@@ -8,7 +8,7 @@ import os
 
 router = APIRouter(prefix="/borrow", tags=["borrow"])
 
-BASE_URL = os.getenv("FRONTEND_URL", "https://yourname.github.io/jig-app")
+BASE_URL = os.getenv("FRONTEND_URL", "https://nguyenluc93.github.io/jig-lastend")
 
 def generate_qr_base64(data: str) -> str:
     qr = qrcode.make(data)

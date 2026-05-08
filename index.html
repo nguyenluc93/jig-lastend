@@ -292,6 +292,36 @@ const api = async (path, opts={}) => {
   return r.json();
 };
 function esc(s){ if(s==null)return""; return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function jpErr(e) {
+  const raw = (typeof e === "string") ? e : (e?.message || String(e));
+  try { const o = JSON.parse(raw); if (o.detail) return jpErr(o.detail); } catch(_) {}
+  
+  const map = [
+    [/session.*(không|not found|exist|không tồn tại)/i, "セッションが見つかりません。QRコードを確認してください"],
+    [/(đã trả xong|already.*return|already.*used|すでにUSED)/i, "このJIGはすでに返却済みです"],
+    [/session.*(hết hạn|expired)/i, "セッションの有効期限が切れました"],
+    [/(not available|in_use|đang.*sử dụng|đang được|使用中)/i, "このJIGは現在使用中です"],
+    [/jig.*(không.*tìm|not found)/i, "JIGが見つかりません"],
+    [/(không tìm thấy|không.*tồn|not found)/i, "該当するデータが見つかりません"],
+    [/(duplicate|already exist|conflict|409|trùng|đã tồn tại)/i, "このコードはすでに登録されています"],
+    [/(unauthorized|401|chưa.*đăng nhập|sai.*mật)/i, "認証エラーです。再ログインしてください"],
+    [/(forbidden|403|không.*quyền)/i, "この操作を行う権限がありません"],
+    [/(camera|getUserMedia)/i, "カメラの起動に失敗しました。設定を確認してください"],
+    [/(network|failed to fetch|kết nối|connect)/i, "サーバーに接続できません。ネットワークを確認してください"],
+    [/(timeout|hết.*thời gian)/i, "タイムアウトしました。再度お試しください"],
+    [/(jwt|token.*invalid|signature|phiên.*hết)/i, "セッションが切れました。再ログインしてください"],
+    [/(500|server error|lỗi.*máy chủ)/i, "サーバーエラーが発生しました"],
+    [/một số|some.*jig|không.*sẵn/i, "一部のJIGが利用できません"]
+  ];
+  
+  for (const [pat, msg] of map) {
+    if (pat.test(raw)) return msg;
+  }
+  
+  if (/[àáâãèéêìíòóôõùúýăđơư]/i.test(raw)) return "エラーが発生しました。管理者に連絡してください";
+  return raw;
+}
+
 
 /* ── image popup ── */
 function openImgPopup(url){ document.getElementById("img-popup-img").src=url; document.getElementById("img-popup-overlay").classList.add("open"); }
@@ -384,7 +414,7 @@ function go(page){
 function toggleMoreDrawer(){ document.getElementById("more-drawer").classList.toggle("open"); document.getElementById("drawer-overlay").classList.toggle("open"); }
 function closeMoreDrawer(){ document.getElementById("more-drawer").classList.remove("open"); document.getElementById("drawer-overlay").classList.remove("open"); }
 function stopAllScanners(){
-  if(html5Scanner){html5Scanner.stop().catch(()=>{});html5Scanner=null;}
+  if(html5Scanner){html5Scanner.stop().catch(()=>{});html5Scanner=null; _borrowScanLocked = false;}
   if(html5ReturnScanner){html5ReturnScanner.stop().catch(()=>{});html5ReturnScanner=null;}
 }
 
@@ -425,24 +455,53 @@ function setBorrowMode(mode){
   }
 }
 
+function resumeBorrowScan(){
+  _borrowScanLocked = false;
+  document.getElementById("scan-locked-overlay").style.display = "none";
+  document.getElementById("scan-result").textContent = "次のQRをスキャンしてください";
+}
+
 function startBorrowScanner(){
+  _borrowScanLocked = false;
+  const overlay = document.getElementById("scan-locked-overlay");
+  if(overlay) overlay.style.display = "none";
+  
   html5Scanner=new Html5Qrcode("qr-reader");
-  html5Scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:220,height:220}},
-    (decoded)=>{
+  html5Scanner.start({facingMode:"environment"},{fps:8,qrbox:{width:220,height:220}},
+    async (decoded)=>{
+      if(_borrowScanLocked) return;
+      _borrowScanLocked = true;
+      
       const p=parseQR(decoded);
-      if(!p){document.getElementById("scan-result").textContent="QRが認識できません"; return;}
-      /* ★ SESSION QR scanned on Borrow page → redirect to Return */
+      if(!p){
+        document.getElementById("scan-result").textContent="QRが認識できません";
+        _borrowScanLocked = false;
+        return;
+      }
+      
       if(p.type==="session"){
         stopAllScanners();
         document.getElementById("session-token-input").value=p.token;
         go("return");
         return;
       }
-      if(borrowQueue.find(x=>x.id===p.id)){document.getElementById("scan-result").textContent=`JIG #${p.id} はすでに追加済み`; return;}
-      addToQueue(p.id,null);
+      
+      if(borrowQueue.find(x=>x.id===p.id)){
+        document.getElementById("scan-result").textContent=`JIG #${p.id} はすでに追加済み`;
+        _borrowScanLocked = false;
+        return;
+      }
+      
+      try {
+        await addToQueue(p.id, null);
+        const overlay = document.getElementById("scan-locked-overlay");
+        if(overlay) overlay.style.display = "flex";
+      } catch(e) {
+        _borrowScanLocked = false;
+      }
     },
     ()=>{}
-  ).catch(e=>{ document.getElementById("scan-result").textContent="カメラ起動失敗: "+e; });
+  ).catch(e=>{ document.getElementById("scan-result").textContent="カメラ起動失敗: "+jpErr(e); });
 }
 
 async function addToQueue(jigId,nameHint){
@@ -541,7 +600,7 @@ async function loadSession(){
           <div style="font-size:12px;color:#6b7280;">${esc(j.description)}</div>
         </div>
       </label>`).join("");
-  }catch(e){alert("Session が見つかりません: "+jpErr(e));}
+  }catch(e){alert("セッションが見つかりません。\n" + jpErr(e));}
 }
 async function submitReturn(all){
   const ids=all?null:Array.from(document.querySelectorAll(".return-check:checked")).map(c=>parseInt(c.value));
